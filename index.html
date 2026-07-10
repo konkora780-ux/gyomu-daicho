@@ -9,10 +9,40 @@
   * { box-sizing: border-box; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "メイリオ", sans-serif;
-    background: #f5f1e8;
+    background: #ded6c4;
     margin: 0;
-    padding: 16px;
+    padding: 24px 16px;
     color: #4a4a4a;
+  }
+  .notebook {
+    max-width: 640px;
+    margin: 0 auto;
+    background: #faf7f0;
+    border-radius: 4px 12px 12px 4px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    padding: 24px 24px 24px 44px;
+    position: relative;
+  }
+  /* 綴じ穴(スパイラルノート風) */
+  .notebook::before {
+    content: "";
+    position: absolute;
+    left: 14px;
+    top: 20px;
+    bottom: 20px;
+    width: 10px;
+    background-image: radial-gradient(circle, #ded6c4 3px, transparent 3.5px);
+    background-size: 10px 26px;
+    background-repeat: repeat-y;
+  }
+  .notebook::after {
+    content: "";
+    position: absolute;
+    left: 28px;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: repeating-linear-gradient(#e3b0b0, #e3b0b0 4px, transparent 4px, transparent 8px);
   }
   .wrap { max-width: 640px; margin: 0 auto; }
 
@@ -38,9 +68,10 @@
 
   /* 追加フォーム(綴じノートの表紙イメージ) */
   .add-card {
-    background: #fff;
+    background: #fffdf8;
+    border: 1px solid #e8e0d0;
     border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     padding: 16px;
     margin-bottom: 20px;
   }
@@ -133,10 +164,13 @@
 
   .empty { text-align: center; color: #aaa; font-size: 14px; padding: 30px 0; }
   .status { font-size: 13px; color: #999; margin: 8px 0; min-height: 18px; }
+  #taskList {
+    background-image: repeating-linear-gradient(#faf7f0, #faf7f0 39px, #e8e0d0 40px);
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
+<div class="notebook">
 
   <header>
     <h1>📒 業務台帳</h1>
