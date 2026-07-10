@@ -238,6 +238,23 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  .calCell .evChip.task {
+    background: #e6f4ea;
+    color: #1e7a3d;
+  }
+  .calLegend {
+    display: flex;
+    gap: 14px;
+    font-size: 11px;
+    color: #999;
+    margin: 6px 2px 10px;
+  }
+  .calLegend span { display: flex; align-items: center; gap: 4px; }
+  .calLegend .dot {
+    width: 9px; height: 9px; border-radius: 2px; display: inline-block;
+  }
+  .calLegend .dot.task { background: #1e7a3d; }
+  .calLegend .dot.event { background: #1a56db; }
   .calCell .evMore { color: #999; font-size: 10px; }
   .dayDetail {
     margin-top: 12px;
@@ -306,6 +323,10 @@
       <button id="calPrevBtn">◀ 前月</button>
       <div class="calTitle" id="calTitle"></div>
       <button id="calNextBtn">次月 ▶</button>
+    </div>
+    <div class="calLegend">
+      <span><span class="dot task"></span>台帳のタスク</span>
+      <span><span class="dot event"></span>カレンダーの予定</span>
     </div>
     <div class="calGrid" id="calGrid"></div>
     <div class="dayDetail" id="dayDetail" style="display:none;"></div>
@@ -709,10 +730,10 @@
 
       monthEvents = {};
       (data.items || []).forEach(ev => {
-        const dateKey = (ev.start.date || (ev.start.dateTime || "").slice(0, 10));
-        if (!dateKey) return;
-        if (!monthEvents[dateKey]) monthEvents[dateKey] = [];
-        monthEvents[dateKey].push(ev);
+        expandEventDates(ev).forEach(dateKey => {
+          if (!monthEvents[dateKey]) monthEvents[dateKey] = [];
+          monthEvents[dateKey].push(ev);
+        });
       });
     } catch (err) {
       calGridEl.innerHTML = '<div class="empty" style="grid-column:1/-1;">予定の取得に失敗しました</div>';
@@ -720,6 +741,41 @@
     }
 
     renderCalendar();
+  }
+
+  // 予定が複数日にまたがる場合、開始日から終了日まで各日のdateKeyを返す
+  // 台帳のタスクから作られた予定かどうかを、descriptionの目印文字列で判定
+  function isTaskEvent(ev) {
+    return !!(ev.description && ev.description.includes("業務台帳タスク"));
+  }
+
+  function expandEventDates(ev) {
+    let startKey, lastKey; // lastKeyは「含まれる」最終日
+
+    if (ev.start.date) {
+      // 終日予定:end.dateは「翌日」を指す仕様なので1日引く
+      startKey = ev.start.date;
+      const endD = new Date(ev.end.date + "T00:00:00");
+      endD.setDate(endD.getDate() - 1);
+      lastKey = endD.toISOString().slice(0, 10);
+    } else if (ev.start.dateTime) {
+      startKey = ev.start.dateTime.slice(0, 10);
+      lastKey = (ev.end.dateTime || ev.start.dateTime).slice(0, 10);
+    } else {
+      return [];
+    }
+
+    const dates = [];
+    let cur = new Date(startKey + "T00:00:00");
+    const last = new Date(lastKey + "T00:00:00");
+    // 念のため上限日数を設ける(不正なデータで無限ループしないように)
+    let guard = 0;
+    while (cur <= last && guard < 60) {
+      dates.push(cur.toISOString().slice(0, 10));
+      cur.setDate(cur.getDate() + 1);
+      guard++;
+    }
+    return dates;
   }
 
   function renderCalendar() {
@@ -745,7 +801,7 @@
       html += `
         <div class="calCell ${isToday ? "today" : ""} ${isSelected ? "selected" : ""}" data-date="${dateKey}">
           <div class="dNum">${d}</div>
-          ${shown.map(ev => `<div class="evChip">${escapeHtml(ev.summary || "(無題)")}</div>`).join("")}
+          ${shown.map(ev => `<div class="evChip ${isTaskEvent(ev) ? "task" : ""}">${escapeHtml(ev.summary || "(無題)")}</div>`).join("")}
           ${moreCount > 0 ? `<div class="evMore">他${moreCount}件</div>` : ""}
         </div>
       `;
@@ -781,7 +837,7 @@
         const st = new Date(ev.start.dateTime);
         timeLabel = st.getHours().toString().padStart(2, "0") + ":" + st.getMinutes().toString().padStart(2, "0");
       }
-      return `<div class="evRow"><span class="evTime">${timeLabel}</span>${escapeHtml(ev.summary || "(無題)")}</div>`;
+      return `<div class="evRow"><span class="dot ${isTaskEvent(ev) ? "task" : "event"}" style="margin-right:6px;"></span><span class="evTime">${timeLabel}</span>${escapeHtml(ev.summary || "(無題)")}</div>`;
     }).join("");
 
     dayDetailEl.innerHTML = `<div class="dTitle">${m}月${d}日の予定</div>${rows}`;
