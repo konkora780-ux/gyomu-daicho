@@ -747,7 +747,9 @@
       const allItems = listData.items || [];
       log("取得できたカレンダー総数: " + allItems.length + "件");
       allItems.forEach(c => {
-        log("  ・" + (c.summary || "(名前なし)") + "  [selected=" + c.selected + "]");
+        log("  ・" + (c.summary || "(名前なし)"));
+        log("     ID: " + (c.id || "?"));
+        log("     権限: " + (c.accessRole || "?") + " / selected=" + c.selected + " / hidden=" + c.hidden);
       });
 
       const calendars = allItems; // 非表示のカレンダーも含めてすべて対象にする
