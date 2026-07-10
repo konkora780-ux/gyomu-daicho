@@ -1187,6 +1187,16 @@
     loadLinks();
   }
 
+  // 期限の日付欄は枠のどこをクリックしてもカレンダーが開くようにする
+  // （標準のアイコンだけだと小さくて押しにくいため）
+  const dueInputEl = document.getElementById("dueInput");
+  dueInputEl.addEventListener("click", () => {
+    if (typeof dueInputEl.showPicker === "function") {
+      try { dueInputEl.showPicker(); } catch (e) {}
+    }
+  });
+  dueInputEl.style.cursor = "pointer";
+
   /* ---------- 初期化 ---------- */
   handleGoogleRedirect();
   loadTasks();
