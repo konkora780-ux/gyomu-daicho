@@ -338,6 +338,7 @@
     </div>
     <div class="calGrid" id="calGrid"></div>
     <div class="dayDetail" id="dayDetail" style="display:none;"></div>
+    <div id="calDebug" style="margin-top:12px; font-size:11px; color:#888; background:#f5f2ea; border:1px dashed #ccc; border-radius:6px; padding:8px; white-space:pre-wrap; line-height:1.5;"></div>
   </div>
 
 </div>
@@ -714,11 +715,18 @@
     calTitleEl.textContent = `${calYear}年${calMonth + 1}月`;
     calGridEl.innerHTML = '<div class="empty" style="grid-column:1/-1;">読み込み中…</div>';
 
+    const dbg = document.getElementById("calDebug");
+    const log = (msg) => { dbg.textContent += msg + "\n"; };
+    dbg.textContent = "";
+    log("【デバッグ情報】");
+
     const token = await getAccessToken();
     if (!token) {
       calGridEl.innerHTML = '<div class="empty" style="grid-column:1/-1;">Googleに未ログインです</div>';
+      log("トークン取得: 失敗（未ログイン）");
       return;
     }
+    log("トークン取得: OK");
 
     const timeMin = new Date(calYear, calMonth, 1).toISOString();
     const timeMax = new Date(calYear, calMonth + 1, 1).toISOString();
@@ -729,11 +737,25 @@
         "https://www.googleapis.com/calendar/v3/users/me/calendarList",
         { headers: { "Authorization": "Bearer " + token } }
       );
+      log("カレンダー一覧API 応答コード: " + listRes.status);
       const listData = await listRes.json();
-      const calendars = (listData.items || []).filter(c => c.selected !== false);
+
+      if (listData.error) {
+        log("一覧API エラー: " + JSON.stringify(listData.error));
+      }
+
+      const allItems = listData.items || [];
+      log("取得できたカレンダー総数: " + allItems.length + "件");
+      allItems.forEach(c => {
+        log("  ・" + (c.summary || "(名前なし)") + "  [selected=" + c.selected + "]");
+      });
+
+      const calendars = allItems.filter(c => c.selected !== false);
+      log("表示対象カレンダー数: " + calendars.length + "件");
 
       // 2. 各カレンダーから当月の予定をまとめて取得
       monthEvents = {};
+      let totalEvents = 0;
       for (const cal of calendars) {
         const params = new URLSearchParams({
           timeMin, timeMax,
@@ -746,19 +768,27 @@
             encodeURIComponent(cal.id) + "/events?" + params.toString(),
           { headers: { "Authorization": "Bearer " + token } }
         );
-        if (!res.ok) continue; // 権限がないカレンダーなどはスキップ
+        if (!res.ok) {
+          log("  × " + (cal.summary || "?") + " 取得失敗(コード" + res.status + ")");
+          continue;
+        }
         const data = await res.json();
+        const cnt = (data.items || []).length;
+        totalEvents += cnt;
+        log("  ○ " + (cal.summary || "?") + " 予定" + cnt + "件");
 
         (data.items || []).forEach(ev => {
-          ev._calName = cal.summary || ""; // どのカレンダーの予定か記録
+          ev._calName = cal.summary || "";
           expandEventDates(ev).forEach(dateKey => {
             if (!monthEvents[dateKey]) monthEvents[dateKey] = [];
             monthEvents[dateKey].push(ev);
           });
         });
       }
+      log("合計取得予定数: " + totalEvents + "件");
     } catch (err) {
       calGridEl.innerHTML = '<div class="empty" style="grid-column:1/-1;">予定の取得に失敗しました</div>';
+      log("例外エラー: " + err.message);
       return;
     }
 
