@@ -6,49 +6,172 @@
 <title>業務台帳</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
+  * { box-sizing: border-box; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "メイリオ", sans-serif;
     background: #f5f1e8;
+    margin: 0;
+    padding: 16px;
+    color: #4a4a4a;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; }
+
+  /* ヘッダー */
+  header {
     display: flex;
     align-items: center;
-    justify-content: center;
-    height: 100vh;
-    margin: 0;
+    justify-content: space-between;
+    margin-bottom: 16px;
   }
-  .card {
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    padding: 40px;
-    text-align: center;
-    max-width: 400px;
-  }
-  h1 { color: #4a4a4a; margin-bottom: 8px; }
-  p { color: #888; font-size: 14px; }
-  button {
-    margin-top: 20px;
-    padding: 12px 24px;
-    font-size: 15px;
+  header h1 { font-size: 22px; margin: 0; }
+  #loginArea button {
+    padding: 8px 14px;
+    font-size: 13px;
     border: none;
     border-radius: 8px;
     background: #4285F4;
     color: #fff;
     cursor: pointer;
   }
-  button:disabled { background: #ccc; }
-  .status { margin-top: 16px; font-size: 13px; color: #4a4a4a; white-space: pre-wrap; word-break: break-all; }
+  #loginArea button:disabled { background: #ccc; }
+  #loginArea .ok { font-size: 12px; color: #2a9d5c; }
+
+  /* 追加フォーム(綴じノートの表紙イメージ) */
+  .add-card {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    padding: 16px;
+    margin-bottom: 20px;
+  }
+  .add-card .row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .add-card input[type=text], .add-card input[type=date], .add-card select {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  #titleInput { flex: 1 1 100%; }
+  #dueInput { flex: 1 1 130px; }
+  #prioritySelect, #categoryInput, #recurSelect { flex: 1 1 100px; }
+  .add-card button {
+    margin-top: 4px;
+    padding: 10px;
+    width: 100%;
+    border: none;
+    border-radius: 8px;
+    background: #4a4a4a;
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  /* タスク一覧(綴じノートの1ページ1ページ) */
+  .task {
+    position: relative;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    margin-bottom: 10px;
+    padding: 12px 14px 12px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    overflow: hidden;
+  }
+  .task::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 6px;
+  }
+  .task.p-高::before { background: #e76f51; }
+  .task.p-中::before { background: #e9c46a; }
+  .task.p-低::before { background: #6fa88a; }
+
+  .task.done { opacity: 0.55; }
+  .task .stamp {
+    position: absolute;
+    right: 10px;
+    top: 8px;
+    border: 2px solid #c0392b;
+    color: #c0392b;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 1px 6px;
+    border-radius: 4px;
+    transform: rotate(-12deg);
+    letter-spacing: 2px;
+  }
+
+  .task .check {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+  .task .info { flex: 1; min-width: 0; }
+  .task .title { font-size: 15px; font-weight: 600; word-break: break-word; }
+  .task .title.done-text { text-decoration: line-through; }
+  .task .meta { font-size: 12px; color: #999; margin-top: 3px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .task .meta .tag {
+    background: #f0ece2;
+    border-radius: 4px;
+    padding: 1px 6px;
+  }
+  .task .delBtn {
+    flex-shrink: 0;
+    border: none;
+    background: none;
+    color: #bbb;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+  }
+
+  .empty { text-align: center; color: #aaa; font-size: 14px; padding: 30px 0; }
+  .status { font-size: 13px; color: #999; margin: 8px 0; min-height: 18px; }
 </style>
 </head>
 <body>
-  <div class="card">
+<div class="wrap">
+
+  <header>
     <h1>📒 業務台帳</h1>
-    <p id="desc">Googleカレンダーと連携します</p>
-    <button id="loginBtn">Googleでログイン</button>
-    <div class="status" id="status"></div>
+    <div id="loginArea">
+      <button id="loginBtn">Googleでログイン</button>
+    </div>
+  </header>
+
+  <div class="add-card">
+    <div class="row">
+      <input type="text" id="titleInput" placeholder="タスク名(必須)">
+    </div>
+    <div class="row">
+      <input type="date" id="dueInput">
+      <select id="prioritySelect">
+        <option value="高">優先度:高</option>
+        <option value="中" selected>優先度:中</option>
+        <option value="低">優先度:低</option>
+      </select>
+      <input type="text" id="categoryInput" placeholder="カテゴリ(任意)">
+      <select id="recurSelect">
+        <option value="none">繰り返しなし</option>
+        <option value="daily">毎日</option>
+        <option value="weekly">毎週</option>
+        <option value="monthly">毎月</option>
+      </select>
+    </div>
+    <button id="addBtn">追加</button>
   </div>
 
+  <div class="status" id="status"></div>
+  <div id="taskList"></div>
+
+</div>
+
 <script>
-  // ==== 設定値(こんちゃんの環境用) ====
+  // ==== 設定値 ====
   const SUPABASE_URL = "https://glxszbwsvembyygocekp.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_9grsvrOlzxrzJqsKvqF1ow_u8SFQsII";
   const GOOGLE_CLIENT_ID = "167635596955-2pvvv4rfsg55dq0ho4lkrkkm2gpjrvdi.apps.googleusercontent.com";
@@ -60,12 +183,13 @@
 
   const statusEl = document.getElementById("status");
   const loginBtn = document.getElementById("loginBtn");
+  const loginArea = document.getElementById("loginArea");
+  const taskListEl = document.getElementById("taskList");
 
-  function setStatus(msg) {
-    statusEl.textContent = msg;
-  }
+  function setStatus(msg) { statusEl.textContent = msg || ""; }
 
-  // Googleログイン開始
+  /* ---------- Googleログイン部分 ---------- */
+
   loginBtn.addEventListener("click", () => {
     const params = new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID,
@@ -78,18 +202,15 @@
     window.location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + params.toString();
   });
 
-  // 認証コードが付いて戻ってきた場合の処理
-  async function handleRedirect() {
+  async function handleGoogleRedirect() {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get("code");
     if (!code) {
-      await checkExistingLogin();
+      await refreshLoginStatus();
       return;
     }
-
-    setStatus("ログイン処理中…");
     loginBtn.disabled = true;
-
+    loginBtn.textContent = "ログイン処理中…";
     try {
       const res = await fetch(EDGE_FUNCTION_URL, {
         method: "POST",
@@ -101,56 +222,125 @@
         body: JSON.stringify({ action: "exchange", code, redirect_uri: REDIRECT_URI })
       });
       const data = await res.json();
-
       if (data.error) {
-        setStatus("エラー:" + data.error + "\n" + (data.error_description || ""));
-        loginBtn.disabled = false;
-        return;
-      }
-
-      // アクセストークンは一時保存(有効期限が短いため)
-      localStorage.setItem("gt_access_token", data.access_token);
-      localStorage.setItem("gt_expires_at", Date.now() + data.expires_in * 1000);
-
-      // リフレッシュトークンはSupabaseに保存(初回ログイン時のみ発行される)
-      if (data.refresh_token) {
-        const { error } = await sb
-          .from("app_settings")
+        setStatus("ログインエラー:" + data.error);
+      } else if (data.refresh_token) {
+        await sb.from("app_settings")
           .update({ google_refresh_token: data.refresh_token, updated_at: new Date().toISOString() })
           .eq("id", 1);
-        if (error) {
-          setStatus("トークン保存エラー:" + error.message);
-          loginBtn.disabled = false;
-          return;
-        }
       }
-
-      // URLからcodeを消してきれいにする
       window.history.replaceState({}, document.title, REDIRECT_URI);
-
-      setStatus("ログイン成功しました。");
-      loginBtn.textContent = "ログイン済み";
     } catch (err) {
       setStatus("通信エラー:" + err.message);
-      loginBtn.disabled = false;
+    }
+    await refreshLoginStatus();
+  }
+
+  async function refreshLoginStatus() {
+    const { data } = await sb.from("app_settings").select("google_refresh_token").eq("id", 1).single();
+    if (data && data.google_refresh_token) {
+      loginArea.innerHTML = '<span class="ok">✓ カレンダー連携済み</span>';
+    } else {
+      loginArea.innerHTML = '<button id="loginBtn">Googleでログイン</button>';
+      document.getElementById("loginBtn").addEventListener("click", () => loginBtn.click());
     }
   }
 
-  // すでにログイン済み(リフレッシュトークンがある)か確認
-  async function checkExistingLogin() {
+  /* ---------- タスク管理部分 ---------- */
+
+  async function loadTasks() {
+    setStatus("読み込み中…");
     const { data, error } = await sb
-      .from("app_settings")
-      .select("google_refresh_token")
-      .eq("id", 1)
-      .single();
+      .from("tasks_ledger")
+      .select("*")
+      .order("done", { ascending: true })
+      .order("due_date", { ascending: true, nullsFirst: false });
 
-    if (!error && data && data.google_refresh_token) {
-      setStatus("すでにログイン済みです。");
-      loginBtn.textContent = "再ログイン";
+    if (error) {
+      setStatus("読み込みエラー:" + error.message);
+      return;
     }
+    setStatus("");
+    renderTasks(data);
   }
 
-  handleRedirect();
+  function renderTasks(tasks) {
+    if (!tasks || tasks.length === 0) {
+      taskListEl.innerHTML = '<div class="empty">タスクはまだありません</div>';
+      return;
+    }
+    taskListEl.innerHTML = tasks.map(t => taskHtml(t)).join("");
+
+    tasks.forEach(t => {
+      document.getElementById("check-" + t.id).addEventListener("change", () => toggleDone(t.id, !t.done));
+      document.getElementById("del-" + t.id).addEventListener("click", () => deleteTask(t.id, t.title));
+    });
+  }
+
+  function taskHtml(t) {
+    const recurLabel = { none: "", daily: "🔁毎日", weekly: "🔁毎週", monthly: "🔁毎月" }[t.recur] || "";
+    return `
+      <div class="task p-${t.priority} ${t.done ? "done" : ""}">
+        ${t.done ? '<div class="stamp">済</div>' : ""}
+        <input type="checkbox" class="check" id="check-${t.id}" ${t.done ? "checked" : ""}>
+        <div class="info">
+          <div class="title ${t.done ? "done-text" : ""}">${escapeHtml(t.title)}</div>
+          <div class="meta">
+            ${t.due_date ? `<span class="tag">📅 ${t.due_date}</span>` : ""}
+            <span class="tag">${t.priority}</span>
+            ${t.category ? `<span class="tag">${escapeHtml(t.category)}</span>` : ""}
+            ${recurLabel ? `<span class="tag">${recurLabel}</span>` : ""}
+          </div>
+        </div>
+        <button class="delBtn" id="del-${t.id}">✕</button>
+      </div>
+    `;
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+  }
+
+  async function toggleDone(id, newDone) {
+    const { error } = await sb.from("tasks_ledger").update({ done: newDone }).eq("id", id);
+    if (error) { setStatus("更新エラー:" + error.message); return; }
+    await loadTasks();
+  }
+
+  async function deleteTask(id, title) {
+    if (!confirm(`「${title}」を削除します。よろしいですか？`)) return;
+    const { error } = await sb.from("tasks_ledger").delete().eq("id", id);
+    if (error) { setStatus("削除エラー:" + error.message); return; }
+    await loadTasks();
+  }
+
+  document.getElementById("addBtn").addEventListener("click", async () => {
+    const title = document.getElementById("titleInput").value.trim();
+    if (!title) { setStatus("タスク名を入力してください"); return; }
+
+    const due = document.getElementById("dueInput").value || null;
+    const priority = document.getElementById("prioritySelect").value;
+    const category = document.getElementById("categoryInput").value.trim() || null;
+    const recur = document.getElementById("recurSelect").value;
+
+    const { error } = await sb.from("tasks_ledger").insert({
+      title, due_date: due, priority, category, recur
+    });
+
+    if (error) { setStatus("追加エラー:" + error.message); return; }
+
+    document.getElementById("titleInput").value = "";
+    document.getElementById("categoryInput").value = "";
+    document.getElementById("dueInput").value = "";
+    setStatus("");
+    await loadTasks();
+  });
+
+  /* ---------- 初期化 ---------- */
+  handleGoogleRedirect();
+  loadTasks();
 </script>
 </body>
 </html>
