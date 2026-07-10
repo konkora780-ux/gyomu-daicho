@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>業務台帳</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "メイリオ", sans-serif;
@@ -22,20 +23,134 @@
     text-align: center;
     max-width: 400px;
   }
-  h1 {
-    color: #4a4a4a;
-    margin-bottom: 8px;
+  h1 { color: #4a4a4a; margin-bottom: 8px; }
+  p { color: #888; font-size: 14px; }
+  button {
+    margin-top: 20px;
+    padding: 12px 24px;
+    font-size: 15px;
+    border: none;
+    border-radius: 8px;
+    background: #4285F4;
+    color: #fff;
+    cursor: pointer;
   }
-  p {
-    color: #888;
-    font-size: 14px;
-  }
+  button:disabled { background: #ccc; }
+  .status { margin-top: 16px; font-size: 13px; color: #4a4a4a; white-space: pre-wrap; word-break: break-all; }
 </style>
 </head>
 <body>
   <div class="card">
     <h1>📒 業務台帳</h1>
-    <p>準備中です。ただいま開発を進めています。</p>
+    <p id="desc">Googleカレンダーと連携します</p>
+    <button id="loginBtn">Googleでログイン</button>
+    <div class="status" id="status"></div>
   </div>
+
+<script>
+  // ==== 設定値(こんちゃんの環境用) ====
+  const SUPABASE_URL = "https://glxszbwsvembyygocekp.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_9grsvrOlzxrzJqsKvqF1ow_u8SFQsII";
+  const GOOGLE_CLIENT_ID = "167635596955-2pvvv4rfsg55dq0ho4lkrkkm2gpjrvdi.apps.googleusercontent.com";
+  const REDIRECT_URI = window.location.origin + window.location.pathname;
+  const EDGE_FUNCTION_URL = SUPABASE_URL + "/functions/v1/google-auth";
+  const SCOPE = "https://www.googleapis.com/auth/calendar";
+
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const statusEl = document.getElementById("status");
+  const loginBtn = document.getElementById("loginBtn");
+
+  function setStatus(msg) {
+    statusEl.textContent = msg;
+  }
+
+  // Googleログイン開始
+  loginBtn.addEventListener("click", () => {
+    const params = new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      redirect_uri: REDIRECT_URI,
+      response_type: "code",
+      scope: SCOPE,
+      access_type: "offline",
+      prompt: "consent"
+    });
+    window.location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + params.toString();
+  });
+
+  // 認証コードが付いて戻ってきた場合の処理
+  async function handleRedirect() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get("code");
+    if (!code) {
+      await checkExistingLogin();
+      return;
+    }
+
+    setStatus("ログイン処理中…");
+    loginBtn.disabled = true;
+
+    try {
+      const res = await fetch(EDGE_FUNCTION_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+          "apikey": SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({ action: "exchange", code, redirect_uri: REDIRECT_URI })
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        setStatus("エラー:" + data.error + "\n" + (data.error_description || ""));
+        loginBtn.disabled = false;
+        return;
+      }
+
+      // アクセストークンは一時保存(有効期限が短いため)
+      localStorage.setItem("gt_access_token", data.access_token);
+      localStorage.setItem("gt_expires_at", Date.now() + data.expires_in * 1000);
+
+      // リフレッシュトークンはSupabaseに保存(初回ログイン時のみ発行される)
+      if (data.refresh_token) {
+        const { error } = await supabase
+          .from("app_settings")
+          .update({ google_refresh_token: data.refresh_token, updated_at: new Date().toISOString() })
+          .eq("id", 1);
+        if (error) {
+          setStatus("トークン保存エラー:" + error.message);
+          loginBtn.disabled = false;
+          return;
+        }
+      }
+
+      // URLからcodeを消してきれいにする
+      window.history.replaceState({}, document.title, REDIRECT_URI);
+
+      setStatus("ログイン成功しました。");
+      loginBtn.textContent = "ログイン済み";
+    } catch (err) {
+      setStatus("通信エラー:" + err.message);
+      loginBtn.disabled = false;
+    }
+  }
+
+  // すでにログイン済み(リフレッシュトークンがある)か確認
+  async function checkExistingLogin() {
+    const { data, error } = await supabase
+      .from("app_settings")
+      .select("google_refresh_token")
+      .eq("id", 1)
+      .single();
+
+    if (!error && data && data.google_refresh_token) {
+      setStatus("すでにログイン済みです。");
+      loginBtn.textContent = "再ログイン";
+    }
+  }
+
+  handleRedirect();
+</script>
 </body>
 </html>
