@@ -785,6 +785,10 @@
         const cnt = (data.items || []).length;
         totalEvents += cnt;
         log("  ○ " + (cal.summary || "?") + " 予定" + cnt + "件");
+        (data.items || []).forEach(ev => {
+          const d = ev.start.date || (ev.start.dateTime || "").slice(0, 10);
+          log("      - " + d + " " + (ev.summary || "(無題)"));
+        });
 
         (data.items || []).forEach(ev => {
           ev._calName = cal.summary || "";
