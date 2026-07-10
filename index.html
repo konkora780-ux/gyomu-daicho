@@ -287,6 +287,15 @@
     return d.toISOString().slice(0, 10);
   }
 
+  function nextDueDate(dateStr, recur) {
+    const d = new Date(dateStr + "T00:00:00");
+    if (recur === "daily") d.setDate(d.getDate() + 1);
+    else if (recur === "weekly") d.setDate(d.getDate() + 7);
+    else if (recur === "monthly") d.setMonth(d.getMonth() + 1);
+    else return null;
+    return d.toISOString().slice(0, 10);
+  }
+
   function recurRule(recur) {
     const map = { daily: "DAILY", weekly: "WEEKLY", monthly: "MONTHLY" };
     return map[recur] ? [`RRULE:FREQ=${map[recur]}`] : undefined;
@@ -421,6 +430,27 @@
       .update({ done: newDone, google_event_id: newEventId })
       .eq("id", id);
     if (error) { setStatus("更新エラー:" + error.message); return; }
+
+    // 繰り返しタスクを完了にした場合、次回分を自動生成
+    if (newDone && task.recur !== "none" && task.due_date) {
+      const next = nextDueDate(task.due_date, task.recur);
+      const { data: created } = await sb.from("tasks_ledger").insert({
+        title: task.title,
+        due_date: next,
+        priority: task.priority,
+        category: task.category,
+        recur: task.recur,
+        done: false
+      }).select().single();
+
+      if (created) {
+        const eventId = await createCalendarEvent(created);
+        if (eventId) {
+          await sb.from("tasks_ledger").update({ google_event_id: eventId }).eq("id", created.id);
+        }
+      }
+    }
+
     await loadTasks();
   }
 
