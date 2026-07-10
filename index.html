@@ -272,6 +272,14 @@
   .dayDetail .evRow:last-child { border-bottom: none; }
   .dayDetail .evTime { color: #999; font-size: 12px; margin-right: 6px; }
   .dayDetail .evEmpty { color: #aaa; font-size: 13px; }
+  .dayDetail .evCal {
+    font-size: 11px;
+    color: #999;
+    background: #f0ece2;
+    border-radius: 3px;
+    padding: 1px 5px;
+    margin-left: 6px;
+  }
 </style>
 </head>
 <body>
@@ -701,7 +709,7 @@
     loadMonthEvents();
   });
 
-  // 指定した月のGoogleカレンダー予定を取得して表示
+  // 指定した月のGoogleカレンダー予定を「全カレンダー分」取得して表示
   async function loadMonthEvents() {
     calTitleEl.textContent = `${calYear}年${calMonth + 1}月`;
     calGridEl.innerHTML = '<div class="empty" style="grid-column:1/-1;">読み込み中…</div>';
@@ -716,25 +724,39 @@
     const timeMax = new Date(calYear, calMonth + 1, 1).toISOString();
 
     try {
-      const params = new URLSearchParams({
-        timeMin, timeMax,
-        singleEvents: "true",
-        orderBy: "startTime",
-        maxResults: "250"
-      });
-      const res = await fetch(
-        "https://www.googleapis.com/calendar/v3/calendars/primary/events?" + params.toString(),
+      // 1. 利用中のカレンダー一覧を取得
+      const listRes = await fetch(
+        "https://www.googleapis.com/calendar/v3/users/me/calendarList",
         { headers: { "Authorization": "Bearer " + token } }
       );
-      const data = await res.json();
+      const listData = await listRes.json();
+      const calendars = (listData.items || []).filter(c => c.selected !== false);
 
+      // 2. 各カレンダーから当月の予定をまとめて取得
       monthEvents = {};
-      (data.items || []).forEach(ev => {
-        expandEventDates(ev).forEach(dateKey => {
-          if (!monthEvents[dateKey]) monthEvents[dateKey] = [];
-          monthEvents[dateKey].push(ev);
+      for (const cal of calendars) {
+        const params = new URLSearchParams({
+          timeMin, timeMax,
+          singleEvents: "true",
+          orderBy: "startTime",
+          maxResults: "250"
         });
-      });
+        const res = await fetch(
+          "https://www.googleapis.com/calendar/v3/calendars/" +
+            encodeURIComponent(cal.id) + "/events?" + params.toString(),
+          { headers: { "Authorization": "Bearer " + token } }
+        );
+        if (!res.ok) continue; // 権限がないカレンダーなどはスキップ
+        const data = await res.json();
+
+        (data.items || []).forEach(ev => {
+          ev._calName = cal.summary || ""; // どのカレンダーの予定か記録
+          expandEventDates(ev).forEach(dateKey => {
+            if (!monthEvents[dateKey]) monthEvents[dateKey] = [];
+            monthEvents[dateKey].push(ev);
+          });
+        });
+      }
     } catch (err) {
       calGridEl.innerHTML = '<div class="empty" style="grid-column:1/-1;">予定の取得に失敗しました</div>';
       return;
@@ -837,7 +859,8 @@
         const st = new Date(ev.start.dateTime);
         timeLabel = st.getHours().toString().padStart(2, "0") + ":" + st.getMinutes().toString().padStart(2, "0");
       }
-      return `<div class="evRow"><span class="dot ${isTaskEvent(ev) ? "task" : "event"}" style="margin-right:6px;"></span><span class="evTime">${timeLabel}</span>${escapeHtml(ev.summary || "(無題)")}</div>`;
+      const calTag = ev._calName ? `<span class="evCal">${escapeHtml(ev._calName)}</span>` : "";
+      return `<div class="evRow"><span class="dot ${isTaskEvent(ev) ? "task" : "event"}" style="margin-right:6px;"></span><span class="evTime">${timeLabel}</span>${escapeHtml(ev.summary || "(無題)")}${calTag}</div>`;
     }).join("");
 
     dayDetailEl.innerHTML = `<div class="dTitle">${m}月${d}日の予定</div>${rows}`;
