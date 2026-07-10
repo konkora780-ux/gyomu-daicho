@@ -363,7 +363,7 @@
 
   /* ---------- Googleログイン部分 ---------- */
 
-  loginBtn.addEventListener("click", () => {
+  function startGoogleLogin() {
     const params = new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID,
       redirect_uri: REDIRECT_URI,
@@ -373,7 +373,9 @@
       prompt: "consent"
     });
     window.location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + params.toString();
-  });
+  }
+
+  loginBtn.addEventListener("click", startGoogleLogin);
 
   async function handleGoogleRedirect() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -412,10 +414,15 @@
   async function refreshLoginStatus() {
     const { data } = await sb.from("app_settings").select("google_refresh_token").eq("id", 1).single();
     if (data && data.google_refresh_token) {
-      loginArea.innerHTML = '<span class="ok">✓ カレンダー連携済み</span>';
+      loginArea.innerHTML = '<span class="ok">✓ カレンダー連携済み</span> <button id="reloginBtn" style="padding:6px 10px; font-size:12px; border:1px solid #4285F4; border-radius:8px; background:#fff; color:#4285F4; cursor:pointer;">🔄 再連携</button>';
+      document.getElementById("reloginBtn").addEventListener("click", () => {
+        if (confirm("Googleに再ログインして、すべてのカレンダーへのアクセスを取り直します。よろしいですか？")) {
+          startGoogleLogin();
+        }
+      });
     } else {
-      loginArea.innerHTML = '<button id="loginBtn">Googleでログイン</button>';
-      document.getElementById("loginBtn").addEventListener("click", () => loginBtn.click());
+      loginArea.innerHTML = '<button id="loginBtn2">Googleでログイン</button>';
+      document.getElementById("loginBtn2").addEventListener("click", startGoogleLogin);
     }
   }
 
