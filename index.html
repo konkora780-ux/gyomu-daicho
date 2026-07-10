@@ -165,6 +165,9 @@
     <button id="addBtn">追加</button>
   </div>
 
+  <div class="row" style="display:flex; justify-content:flex-end; margin-bottom:4px;">
+    <button id="syncBtn" style="border:none; background:none; color:#7a9; font-size:12px; cursor:pointer;">🔄 カレンダーと同期</button>
+  </div>
   <div class="status" id="status"></div>
   <div id="taskList"></div>
 
@@ -246,6 +249,101 @@
     }
   }
 
+  /* ---------- Googleカレンダー連携部分 ---------- */
+
+  // 有効なアクセストークンを取得(期限切れなら自動でリフレッシュ)
+  async function getAccessToken() {
+    const cached = localStorage.getItem("gt_access_token");
+    const expiresAt = Number(localStorage.getItem("gt_expires_at") || 0);
+    if (cached && Date.now() < expiresAt - 60000) {
+      return cached;
+    }
+
+    const { data } = await sb.from("app_settings").select("google_refresh_token").eq("id", 1).single();
+    if (!data || !data.google_refresh_token) return null;
+
+    const res = await fetch(EDGE_FUNCTION_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+        "apikey": SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify({ action: "refresh", refresh_token: data.google_refresh_token })
+    });
+    const tokenData = await res.json();
+    if (tokenData.error) return null;
+
+    localStorage.setItem("gt_access_token", tokenData.access_token);
+    localStorage.setItem("gt_expires_at", Date.now() + tokenData.expires_in * 1000);
+    return tokenData.access_token;
+  }
+
+  function addDays(dateStr, n) {
+    const d = new Date(dateStr + "T00:00:00");
+    d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function recurRule(recur) {
+    const map = { daily: "DAILY", weekly: "WEEKLY", monthly: "MONTHLY" };
+    return map[recur] ? [`RRULE:FREQ=${map[recur]}`] : undefined;
+  }
+
+  // タスクからカレンダー予定を新規作成し、event_idを返す
+  async function createCalendarEvent(task) {
+    if (!task.due_date) return null;
+    const token = await getAccessToken();
+    if (!token) return null;
+
+    const body = {
+      summary: task.title,
+      description: "業務台帳タスク(id:" + task.id + ")",
+      start: { date: task.due_date },
+      end: { date: addDays(task.due_date, 1) },
+      recurrence: recurRule(task.recur)
+    };
+
+    const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    return data.id || null;
+  }
+
+  async function deleteCalendarEvent(eventId) {
+    if (!eventId) return;
+    const token = await getAccessToken();
+    if (!token) return;
+    await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + eventId, {
+      method: "DELETE",
+      headers: { "Authorization": "Bearer " + token }
+    });
+  }
+
+  // Googleカレンダー側で削除された予定を検知し、タスク側のリンクを解除する(タスクは残す)
+  async function syncWithCalendar() {
+    setStatus("カレンダーと同期中…");
+    const token = await getAccessToken();
+    if (!token) { setStatus("Googleに未ログインです"); return; }
+
+    const { data: tasks } = await sb.from("tasks_ledger").select("id, google_event_id").not("google_event_id", "is", null);
+    for (const t of tasks || []) {
+      const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events/" + t.google_event_id, {
+        headers: { "Authorization": "Bearer " + token }
+      });
+      if (res.status === 404 || res.status === 410) {
+        await sb.from("tasks_ledger").update({ google_event_id: null }).eq("id", t.id);
+      }
+    }
+    setStatus("同期完了しました");
+    await loadTasks();
+  }
+
+  document.getElementById("syncBtn").addEventListener("click", syncWithCalendar);
+
   /* ---------- タスク管理部分 ---------- */
 
   async function loadTasks() {
@@ -304,13 +402,31 @@
   }
 
   async function toggleDone(id, newDone) {
-    const { error } = await sb.from("tasks_ledger").update({ done: newDone }).eq("id", id);
+    const { data: task, error: getErr } = await sb.from("tasks_ledger").select("*").eq("id", id).single();
+    if (getErr) { setStatus("更新エラー:" + getErr.message); return; }
+
+    let newEventId = task.google_event_id;
+    if (newDone) {
+      // 完了にする:カレンダー予定を削除
+      await deleteCalendarEvent(task.google_event_id);
+      newEventId = null;
+    } else if (task.due_date) {
+      // 未完了に戻す:カレンダー予定を再作成
+      newEventId = await createCalendarEvent(task);
+    }
+
+    const { error } = await sb.from("tasks_ledger")
+      .update({ done: newDone, google_event_id: newEventId })
+      .eq("id", id);
     if (error) { setStatus("更新エラー:" + error.message); return; }
     await loadTasks();
   }
 
   async function deleteTask(id, title) {
     if (!confirm(`「${title}」を削除します。よろしいですか？`)) return;
+    const { data: task } = await sb.from("tasks_ledger").select("google_event_id").eq("id", id).single();
+    if (task && task.google_event_id) await deleteCalendarEvent(task.google_event_id);
+
     const { error } = await sb.from("tasks_ledger").delete().eq("id", id);
     if (error) { setStatus("削除エラー:" + error.message); return; }
     await loadTasks();
@@ -325,11 +441,19 @@
     const category = document.getElementById("categoryInput").value.trim() || null;
     const recur = document.getElementById("recurSelect").value;
 
-    const { error } = await sb.from("tasks_ledger").insert({
-      title, due_date: due, priority, category, recur
-    });
+    const { data: inserted, error } = await sb.from("tasks_ledger")
+      .insert({ title, due_date: due, priority, category, recur })
+      .select()
+      .single();
 
     if (error) { setStatus("追加エラー:" + error.message); return; }
+
+    if (inserted.due_date) {
+      const eventId = await createCalendarEvent(inserted);
+      if (eventId) {
+        await sb.from("tasks_ledger").update({ google_event_id: eventId }).eq("id", inserted.id);
+      }
+    }
 
     document.getElementById("titleInput").value = "";
     document.getElementById("categoryInput").value = "";
