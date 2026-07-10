@@ -456,10 +456,16 @@
     return tokenData.access_token;
   }
 
+  function ymd(d) {
+    return d.getFullYear() + "-" +
+      String(d.getMonth() + 1).padStart(2, "0") + "-" +
+      String(d.getDate()).padStart(2, "0");
+  }
+
   function addDays(dateStr, n) {
     const d = new Date(dateStr + "T00:00:00");
     d.setDate(d.getDate() + n);
-    return d.toISOString().slice(0, 10);
+    return ymd(d);
   }
 
   function nextDueDate(dateStr, recur) {
@@ -468,7 +474,7 @@
     else if (recur === "weekly") d.setDate(d.getDate() + 7);
     else if (recur === "monthly") d.setMonth(d.getMonth() + 1);
     else return null;
-    return d.toISOString().slice(0, 10);
+    return ymd(d);
   }
 
   function recurRule(recur) {
@@ -815,14 +821,13 @@
   }
 
   function expandEventDates(ev) {
-    let startKey, lastKey; // lastKeyは「含まれる」最終日
+    let startKey, lastKey;
 
     if (ev.start.date) {
-      // 終日予定:end.dateは「翌日」を指す仕様なので1日引く
       startKey = ev.start.date;
       const endD = new Date(ev.end.date + "T00:00:00");
       endD.setDate(endD.getDate() - 1);
-      lastKey = endD.toISOString().slice(0, 10);
+      lastKey = ymd(endD);
     } else if (ev.start.dateTime) {
       startKey = ev.start.dateTime.slice(0, 10);
       lastKey = (ev.end.dateTime || ev.start.dateTime).slice(0, 10);
@@ -833,10 +838,9 @@
     const dates = [];
     let cur = new Date(startKey + "T00:00:00");
     const last = new Date(lastKey + "T00:00:00");
-    // 念のため上限日数を設ける(不正なデータで無限ループしないように)
     let guard = 0;
     while (cur <= last && guard < 60) {
-      dates.push(cur.toISOString().slice(0, 10));
+      dates.push(ymd(cur));
       cur.setDate(cur.getDate() + 1);
       guard++;
     }
