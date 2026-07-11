@@ -482,6 +482,23 @@
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; }
   }
+
+  /* PC(広い画面)向け：横並びレイアウト */
+  .sync-row { display: flex; justify-content: flex-end; margin-bottom: 4px; }
+  @media (min-width: 980px) {
+    body { padding: 48px 24px 64px; }
+    .notebook { max-width: 1140px; padding: 44px 40px 36px; }
+    .viewTabs { display: none; }
+    .panels {
+      display: grid;
+      grid-template-columns: minmax(360px, 400px) 1fr;
+      gap: 30px;
+      align-items: start;
+    }
+    .colRight { position: sticky; top: 24px; }
+    .calCell { min-height: 84px; }
+    #linkView { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 20px; }
+  }
 </style>
 </head>
 <body>
@@ -494,66 +511,75 @@
     </div>
   </header>
 
-  <div class="add-card">
-    <div class="row">
-      <input type="text" id="titleInput" placeholder="タスク名(必須)">
-    </div>
-    <div class="row">
-      <input type="date" id="dueInput">
-      <select id="prioritySelect">
-        <option value="高">優先度:高</option>
-        <option value="中" selected>優先度:中</option>
-        <option value="低">優先度:低</option>
-      </select>
-      <input type="text" id="categoryInput" placeholder="カテゴリ(任意)">
-      <select id="recurSelect">
-        <option value="none">繰り返しなし</option>
-        <option value="daily">毎日</option>
-        <option value="weekly">毎週</option>
-        <option value="monthly">毎月</option>
-      </select>
-    </div>
-    <button id="addBtn">追加</button>
-  </div>
-
-  <div class="row" style="display:flex; justify-content:flex-end; margin-bottom:4px;">
-    <button id="syncBtn" style="border:none; background:none; color:#7a9; font-size:12px; cursor:pointer;">🔄 カレンダーと同期</button>
-  </div>
-  <div class="status" id="status"></div>
-
   <div class="viewTabs">
     <button id="tabTaskBtn" class="active">📋 タスク一覧</button>
     <button id="tabCalBtn">📅 カレンダー</button>
     <button id="tabLinkBtn">🔗 リンク集</button>
   </div>
 
-  <div id="taskList"></div>
+  <div class="panels">
+    <div class="colLeft">
 
-  <div id="linkView" style="display:none;">
-    <div class="add-card">
-      <div class="row">
-        <input type="text" id="linkNameInput" placeholder="リンク名（例：出退勤システム）">
+      <div class="add-card">
+        <div class="row">
+          <input type="text" id="titleInput" placeholder="タスク名(必須)">
+        </div>
+        <div class="row">
+          <input type="date" id="dueInput">
+          <select id="prioritySelect">
+            <option value="高">優先度:高</option>
+            <option value="中" selected>優先度:中</option>
+            <option value="低">優先度:低</option>
+          </select>
+          <input type="text" id="categoryInput" placeholder="カテゴリ(任意)">
+          <select id="recurSelect">
+            <option value="none">繰り返しなし</option>
+            <option value="daily">毎日</option>
+            <option value="weekly">毎週</option>
+            <option value="monthly">毎月</option>
+          </select>
+        </div>
+        <button id="addBtn">追加</button>
       </div>
-      <div class="row">
-        <input type="text" id="linkUrlInput" placeholder="URL（https://…）" style="flex:1 1 100%;">
-      </div>
-      <button id="addLinkBtn">リンクを追加</button>
-    </div>
-    <div id="linkList"></div>
-  </div>
 
-  <div id="calendarView" style="display:none;">
-    <div class="calNav">
-      <button id="calPrevBtn">◀ 前月</button>
-      <div class="calTitle" id="calTitle"></div>
-      <button id="calNextBtn">次月 ▶</button>
+      <div class="row sync-row">
+        <button id="syncBtn">🔄 カレンダーと同期</button>
+      </div>
+      <div class="status" id="status"></div>
+
+      <div id="taskList"></div>
+
+      <div id="linkView" style="display:none;">
+        <div class="add-card">
+          <div class="row">
+            <input type="text" id="linkNameInput" placeholder="リンク名（例：出退勤システム）">
+          </div>
+          <div class="row">
+            <input type="text" id="linkUrlInput" placeholder="URL（https://…）" style="flex:1 1 100%;">
+          </div>
+          <button id="addLinkBtn">リンクを追加</button>
+        </div>
+        <div id="linkList"></div>
+      </div>
+
     </div>
-    <div class="calLegend">
-      <span><span class="dot task"></span>台帳のタスク</span>
-      <span><span class="dot event"></span>カレンダーの予定</span>
+    <div class="colRight">
+
+      <div id="calendarView" style="display:none;">
+        <div class="calNav">
+          <button id="calPrevBtn">◀ 前月</button>
+          <div class="calTitle" id="calTitle"></div>
+          <button id="calNextBtn">次月 ▶</button>
+        </div>
+        <div class="calLegend">
+          <span><span class="dot task"></span>台帳のタスク</span>
+          <span><span class="dot event"></span>カレンダーの予定</span>
+        </div>
+        <div class="calGrid" id="calGrid"></div>
+        <div class="dayDetail" id="dayDetail" style="display:none;"></div>
+      </div>
+
     </div>
-    <div class="calGrid" id="calGrid"></div>
-    <div class="dayDetail" id="dayDetail" style="display:none;"></div>
   </div>
 
 </div>
@@ -908,30 +934,58 @@
   const tabLinkBtn = document.getElementById("tabLinkBtn");
   const linkViewEl = document.getElementById("linkView");
 
+  const WIDE_BP = 980;
+  const isWide = () => window.matchMedia("(min-width:" + WIDE_BP + "px)").matches;
+  let narrowTab = "task";
+
   tabTaskBtn.addEventListener("click", () => switchView("task"));
   tabCalBtn.addEventListener("click", () => switchView("calendar"));
   tabLinkBtn.addEventListener("click", () => switchView("link"));
 
   function switchView(view) {
-    // すべて非アクティブ・非表示にしてから対象だけ出す
+    narrowTab = view;
+    if (isWide()) { applyLayout(); return; }
+    renderNarrow();
+  }
+
+  // 狭い画面(iPadなど)：タブで一つずつ切り替え表示
+  function renderNarrow() {
     [tabTaskBtn, tabCalBtn, tabLinkBtn].forEach(b => b.classList.remove("active"));
     taskListEl.style.display = "none";
     calendarViewEl.style.display = "none";
     linkViewEl.style.display = "none";
-
-    if (view === "task") {
+    if (narrowTab === "task") {
       tabTaskBtn.classList.add("active");
       taskListEl.style.display = "";
-    } else if (view === "calendar") {
+    } else if (narrowTab === "calendar") {
       tabCalBtn.classList.add("active");
       calendarViewEl.style.display = "";
       loadMonthEvents();
-    } else if (view === "link") {
+    } else if (narrowTab === "link") {
       tabLinkBtn.classList.add("active");
       linkViewEl.style.display = "";
       loadLinks();
     }
   }
+
+  // 広い画面(PC)：タスク・リンク・カレンダーを同時に横並び表示
+  function applyLayout() {
+    if (isWide()) {
+      taskListEl.style.display = "";
+      linkViewEl.style.display = "";
+      calendarViewEl.style.display = "";
+      loadMonthEvents();
+      loadLinks();
+    } else {
+      renderNarrow();
+    }
+  }
+
+  let _wasWide = isWide();
+  window.addEventListener("resize", () => {
+    const w = isWide();
+    if (w !== _wasWide) { _wasWide = w; applyLayout(); }
+  });
 
   document.getElementById("calPrevBtn").addEventListener("click", () => {
     calMonth--;
@@ -1200,6 +1254,7 @@
   /* ---------- 初期化 ---------- */
   handleGoogleRedirect();
   loadTasks();
+  applyLayout();
 </script>
 </body>
 </html>
