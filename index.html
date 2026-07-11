@@ -486,17 +486,17 @@
   /* PC(広い画面)向け：横並びレイアウト */
   .sync-row { display: flex; justify-content: flex-end; margin-bottom: 4px; }
   @media (min-width: 980px) {
-    body { padding: 48px 24px 64px; }
-    .notebook { max-width: 1140px; padding: 44px 40px 36px; }
+    body { padding: 44px 28px 60px; }
+    .notebook { max-width: none; padding: 44px 44px 40px; }
     .viewTabs { display: none; }
     .panels {
       display: grid;
-      grid-template-columns: minmax(360px, 400px) 1fr;
-      gap: 30px;
+      grid-template-columns: minmax(380px, 440px) 1fr;
+      gap: 34px;
       align-items: start;
     }
     .colRight { position: sticky; top: 24px; }
-    .calCell { min-height: 84px; }
+    .calCell { min-height: 96px; }
     #linkView { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 20px; }
   }
 </style>
