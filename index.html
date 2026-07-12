@@ -602,6 +602,7 @@
         <div class="calExternalLinks">
           <a href="https://calendar.google.com/" target="_blank" rel="noopener">📅 Googleカレンダーを開く</a>
           <a href="https://mail.google.com/" target="_blank" rel="noopener">✉️ Gmailを開く</a>
+          <span id="calQuickLinks" style="display:contents"></span>
         </div>
         <div class="calGrid" id="calGrid"></div>
         <div class="dayDetail" id="dayDetail" style="display:none;"></div>
@@ -1196,6 +1197,20 @@
 
   document.getElementById("addLinkBtn").addEventListener("click", addLink);
 
+  // カレンダー上部（Gmailの隣）にリンク集の中身を丸ボタンで並べる
+  function renderQuickLinks(data) {
+    const box = document.getElementById("calQuickLinks");
+    if (!box) return;
+    box.innerHTML = (data || []).map(link => {
+      let host = "";
+      try { host = new URL(link.url).hostname; } catch (e) {}
+      const favicon = host
+        ? `<img class="favicon" src="https://www.google.com/s2/favicons?domain=${host}&sz=64" alt="" style="width:16px;height:16px;border-radius:3px;">`
+        : "🔗";
+      return `<a href="${escapeHtml(link.url)}" target="_blank" rel="noopener">${favicon}${escapeHtml(link.name)}</a>`;
+    }).join("");
+  }
+
   async function loadLinks() {
     linkListEl.innerHTML = '<div class="empty">読み込み中…</div>';
     const { data, error } = await sb
@@ -1207,6 +1222,9 @@
       linkListEl.innerHTML = '<div class="empty">リンクの読み込みに失敗しました</div>';
       return;
     }
+
+    renderQuickLinks(data);
+
     if (!data || data.length === 0) {
       linkListEl.innerHTML = '<div class="empty">よく使う業務ページを追加しましょう</div>';
       return;
