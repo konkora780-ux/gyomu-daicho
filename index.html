@@ -230,6 +230,11 @@
   .task .title { font-size: 15px; font-weight: 700; word-break: break-word; color: var(--ink); }
   .task .title.done-text { text-decoration: line-through; color: var(--ink-faint); }
   .task .meta { font-size: 12px; color: var(--ink-faint); margin-top: 4px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .task .meta .doneTag {
+    background: #e8f0e6;
+    color: #3d6b45;
+    border-color: #c5d9c2;
+  }
   .task .meta .tag {
     background: var(--washi-deep);
     border-radius: 6px;
@@ -854,6 +859,7 @@
             <span class="tag">${t.priority}</span>
             ${t.category ? `<span class="tag">${escapeHtml(t.category)}</span>` : ""}
             ${recurLabel ? `<span class="tag">${recurLabel}</span>` : ""}
+            ${t.done && t.done_at ? `<span class="tag doneTag">✅ 済 ${t.done_at}</span>` : ""}
           </div>
         </div>
         <button class="delBtn" id="del-${t.id}">✕</button>
@@ -882,7 +888,7 @@
     }
 
     const { error } = await sb.from("tasks_ledger")
-      .update({ done: newDone, google_event_id: newEventId })
+      .update({ done: newDone, google_event_id: newEventId, done_at: newDone ? ymd(new Date()) : null })
       .eq("id", id);
     if (error) { setStatus("更新エラー:" + error.message); return; }
 
