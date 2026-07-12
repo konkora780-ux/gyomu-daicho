@@ -364,6 +364,30 @@
   }
   .calLegend .dot.task { background: var(--take); }
   .calLegend .dot.event { background: var(--indigo); }
+  .calExternalLinks {
+    display: flex;
+    gap: 8px;
+    margin: 0 2px 14px;
+    flex-wrap: wrap;
+  }
+  .calExternalLinks a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--indigo);
+    text-decoration: none;
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .calExternalLinks a:hover {
+    background: var(--washi-deep);
+    box-shadow: 0 2px 8px rgba(34,38,47,0.08);
+  }
   .calCell .evMore { color: var(--ink-faint); font-size: 10px; }
   .dayDetail {
     margin-top: 14px;
@@ -574,6 +598,10 @@
         <div class="calLegend">
           <span><span class="dot task"></span>台帳のタスク</span>
           <span><span class="dot event"></span>カレンダーの予定</span>
+        </div>
+        <div class="calExternalLinks">
+          <a href="https://calendar.google.com/" target="_blank" rel="noopener">📅 Googleカレンダーを開く</a>
+          <a href="https://mail.google.com/" target="_blank" rel="noopener">✉️ Gmailを開く</a>
         </div>
         <div class="calGrid" id="calGrid"></div>
         <div class="dayDetail" id="dayDetail" style="display:none;"></div>
