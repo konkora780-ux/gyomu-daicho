@@ -448,6 +448,12 @@
   }
   #syncBtn:hover { background: rgba(61,90,128,0.08); }
 
+  .linkListTitle {
+    font-size: 11px;
+    color: var(--ink-faint);
+    letter-spacing: 0.08em;
+    margin: 16px 2px 8px;
+  }
   /* リンク集 */
   #addLinkBtn {
     margin-top: 6px;
@@ -581,7 +587,8 @@
           </div>
           <button id="addLinkBtn">リンクを追加</button>
         </div>
-        <div id="linkList" style="display:none;"></div>
+        <div class="linkListTitle">登録済みのリンク（✕で削除）</div>
+        <div id="linkList"></div>
       </div>
 
     </div>
