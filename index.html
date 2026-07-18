@@ -393,6 +393,96 @@
     background: var(--washi-deep);
     box-shadow: 0 2px 8px rgba(34,38,47,0.08);
   }
+  .quickLinkChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 999px;
+    padding: 4px 4px 4px 14px;
+    transition: background 0.2s, box-shadow 0.2s;
+  }
+  .quickLinkChip:hover {
+    background: var(--washi-deep);
+    box-shadow: 0 2px 8px rgba(34,38,47,0.08);
+  }
+  .quickLinkChip a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    padding: 0;
+    background: transparent;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--indigo);
+    text-decoration: none;
+  }
+  .quickLinkDel {
+    border: none;
+    background: none;
+    color: #c8c2b5;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 3px 6px;
+    border-radius: 999px;
+    transition: color 0.2s, background 0.2s;
+  }
+  .quickLinkDel:hover { color: var(--shu); background: rgba(209,73,91,0.08); }
+  .calAddLinkToggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px dashed var(--line);
+    background: transparent;
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: 500;
+    color: var(--ink-faint);
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  .calAddLinkToggle:hover { background: var(--washi-deep); color: var(--indigo); }
+  .calAddLinkForm {
+    display: none;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 0 2px 14px;
+  }
+  .calAddLinkForm input {
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--ink);
+    background: var(--washi);
+  }
+  .calAddLinkForm input:focus {
+    outline: none;
+    border-color: var(--indigo);
+    box-shadow: 0 0 0 3px rgba(61,90,128,0.12);
+    background: #fff;
+  }
+  .calAddLinkForm #quickLinkNameInput { flex: 1 1 130px; min-width: 110px; }
+  .calAddLinkForm #quickLinkUrlInput { flex: 2 1 200px; min-width: 160px; }
+  .calAddLinkForm button {
+    border: none;
+    border-radius: 8px;
+    background: var(--indigo);
+    color: #fff;
+    font-size: 13px;
+    font-family: inherit;
+    font-weight: 700;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .calAddLinkForm button:hover { background: var(--indigo-deep); }
   .calCell .evMore { color: var(--ink-faint); font-size: 10px; }
   .dayDetail {
     margin-top: 14px;
@@ -530,6 +620,12 @@
           <a href="https://outlook.cloud.microsoft/mail/?realm=iwate-ed.jp&amp;login_hint=ptf30-kondo-fumitaka@iwate-ed.jp" target="_blank" rel="noopener">📧 Outlookメール</a>
           <a href="https://iwateed-my.sharepoint.com/?login_hint=ptf30%2Dkondo%2Dfumitaka%40iwate%2Ded%2Ejp&amp;source=waffle" target="_blank" rel="noopener">☁️ OneDrive</a>
           <span id="calQuickLinks" style="display:contents"></span>
+          <button id="quickLinkAddToggle" class="calAddLinkToggle" type="button">＋ リンク追加</button>
+        </div>
+        <div class="calAddLinkForm" id="calAddLinkForm">
+          <input type="text" id="quickLinkNameInput" placeholder="リンク名">
+          <input type="text" id="quickLinkUrlInput" placeholder="URL（https://…）">
+          <button id="quickLinkAddBtn" type="button">追加</button>
         </div>
         <div class="calGrid" id="calGrid"></div>
         <div class="dayDetail" id="dayDetail" style="display:none;"></div>
@@ -1117,7 +1213,7 @@
 
   /* ---------- リンク集部分(カレンダー内クイックリンク表示のみ) ---------- */
 
-  // カレンダー上部（Gmailの隣）にリンク集の中身を丸ボタンで並べる
+  // カレンダー上部（Gmailの隣）にリンク集の中身を丸ボタンで並べる（×で削除可）
   function renderQuickLinks(data) {
     const box = document.getElementById("calQuickLinks");
     if (!box) return;
@@ -1127,8 +1223,15 @@
       const favicon = host
         ? `<img class="favicon" src="https://www.google.com/s2/favicons?domain=${host}&sz=64" alt="" style="width:16px;height:16px;border-radius:3px;">`
         : "🔗";
-      return `<a href="${escapeHtml(link.url)}" target="_blank" rel="noopener">${favicon}${escapeHtml(link.name)}</a>`;
+      return `<span class="quickLinkChip">
+        <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener">${favicon}${escapeHtml(link.name)}</a>
+        <button class="quickLinkDel" data-id="${link.id}" title="削除">×</button>
+      </span>`;
     }).join("");
+
+    box.querySelectorAll(".quickLinkDel").forEach(btn => {
+      btn.addEventListener("click", () => deleteQuickLink(btn.dataset.id, btn.closest(".quickLinkChip").querySelector("a").textContent.trim()));
+    });
   }
 
   async function refreshQuickLinks() {
@@ -1138,6 +1241,48 @@
       .order("created_at", { ascending: true });
     if (error) return;
     renderQuickLinks(data);
+  }
+
+  async function deleteQuickLink(id, name) {
+    if (!confirm(`「${name}」を削除します。よろしいですか？`)) return;
+    await sb.from("bookmarks").delete().eq("id", id);
+    await refreshQuickLinks();
+  }
+
+  // 「＋ リンク追加」：クリックでミニフォームの開閉
+  const quickLinkAddToggle = document.getElementById("quickLinkAddToggle");
+  const calAddLinkForm = document.getElementById("calAddLinkForm");
+  const quickLinkNameInput = document.getElementById("quickLinkNameInput");
+  const quickLinkUrlInput = document.getElementById("quickLinkUrlInput");
+
+  quickLinkAddToggle.addEventListener("click", () => {
+    const opening = calAddLinkForm.style.display !== "flex";
+    calAddLinkForm.style.display = opening ? "flex" : "none";
+    if (opening) quickLinkNameInput.focus();
+  });
+
+  document.getElementById("quickLinkAddBtn").addEventListener("click", addQuickLink);
+
+  async function addQuickLink() {
+    const name = quickLinkNameInput.value.trim();
+    let url = quickLinkUrlInput.value.trim();
+    if (!name || !url) {
+      alert("リンク名とURLの両方を入力してください");
+      return;
+    }
+    if (!/^https?:\/\//i.test(url)) {
+      url = "https://" + url;
+    }
+
+    const { error } = await sb.from("bookmarks").insert({ name, url });
+    if (error) {
+      alert("追加に失敗しました");
+      return;
+    }
+    quickLinkNameInput.value = "";
+    quickLinkUrlInput.value = "";
+    calAddLinkForm.style.display = "none";
+    await refreshQuickLinks();
   }
 
   // 期限の日付欄は枠のどこをクリックしてもカレンダーが開くようにする
