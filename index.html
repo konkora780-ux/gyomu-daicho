@@ -448,72 +448,6 @@
   }
   #syncBtn:hover { background: rgba(61,90,128,0.08); }
 
-  .linkListTitle {
-    font-size: 11px;
-    color: var(--ink-faint);
-    letter-spacing: 0.08em;
-    margin: 16px 2px 8px;
-  }
-  /* リンク集 */
-  #addLinkBtn {
-    margin-top: 6px;
-    padding: 12px;
-    width: 100%;
-    border: none;
-    border-radius: 10px;
-    background: var(--indigo);
-    color: #fff;
-    font-size: 14px;
-    font-weight: 700;
-    font-family: inherit;
-    letter-spacing: 0.04em;
-    cursor: pointer;
-    transition: background 0.2s, transform 0.1s;
-  }
-  #addLinkBtn:hover { background: var(--indigo-deep); }
-  #addLinkBtn:active { transform: scale(0.99); }
-  .linkItem {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    background: #fff;
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    box-shadow: var(--paper-shadow);
-    padding: 14px 16px;
-    margin-bottom: 11px;
-    text-decoration: none;
-    color: var(--ink);
-    transition: transform 0.12s, box-shadow 0.2s;
-  }
-  .linkItem:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(34,38,47,0.1); }
-  .linkItem .favicon {
-    width: 30px; height: 30px;
-    border-radius: 7px;
-    flex-shrink: 0;
-    background: var(--washi-deep);
-    object-fit: contain;
-  }
-  .linkItem .linkText { flex: 1; min-width: 0; }
-  .linkItem .linkName { font-size: 15px; font-weight: 700; word-break: break-word; }
-  .linkItem .linkUrl {
-    font-size: 12px; color: var(--ink-faint); margin-top: 2px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .linkItem .linkGo { color: var(--ink-faint); font-size: 18px; flex-shrink: 0; margin-right: 22px; }
-  .linkDel {
-    flex-shrink: 0;
-    border: none;
-    background: none;
-    color: #c8c2b5;
-    font-size: 18px;
-    cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 8px;
-    transition: color 0.2s, background 0.2s;
-  }
-  .linkDel:hover { color: var(--shu); background: rgba(209,73,91,0.08); }
-
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; }
   }
@@ -532,7 +466,6 @@
     }
     .colRight { position: sticky; top: 24px; }
     .calCell { min-height: 118px; }
-    #linkView { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 20px; }
   }
 </style>
 </head>
@@ -542,7 +475,6 @@
   <div class="viewTabs">
     <button id="tabTaskBtn" class="active">📋 タスク一覧</button>
     <button id="tabCalBtn">📅 カレンダー</button>
-    <button id="tabLinkBtn">🔗 リンク集</button>
   </div>
 
   <div class="panels">
@@ -576,20 +508,6 @@
       <div class="status" id="status"></div>
 
       <div id="taskList"></div>
-
-      <div id="linkView" style="display:none;">
-        <div class="add-card">
-          <div class="row">
-            <input type="text" id="linkNameInput" placeholder="リンク名（例：出退勤システム）">
-          </div>
-          <div class="row">
-            <input type="text" id="linkUrlInput" placeholder="URL（https://…）" style="flex:1 1 100%;">
-          </div>
-          <button id="addLinkBtn">リンクを追加</button>
-        </div>
-        <div class="linkListTitle">登録済みのリンク（✕で削除）</div>
-        <div id="linkList"></div>
-      </div>
 
     </div>
     <div class="colRight">
@@ -977,16 +895,12 @@
   let monthEvents = {}; // { "YYYY-MM-DD": [event, ...] }
   let selectedDate = null;
 
-  const tabLinkBtn = document.getElementById("tabLinkBtn");
-  const linkViewEl = document.getElementById("linkView");
-
   const WIDE_BP = 980;
   const isWide = () => window.matchMedia("(min-width:" + WIDE_BP + "px)").matches;
   let narrowTab = "task";
 
   tabTaskBtn.addEventListener("click", () => switchView("task"));
   tabCalBtn.addEventListener("click", () => switchView("calendar"));
-  tabLinkBtn.addEventListener("click", () => switchView("link"));
 
   function switchView(view) {
     narrowTab = view;
@@ -996,10 +910,9 @@
 
   // 狭い画面(iPadなど)：タブで一つずつ切り替え表示
   function renderNarrow() {
-    [tabTaskBtn, tabCalBtn, tabLinkBtn].forEach(b => b.classList.remove("active"));
+    [tabTaskBtn, tabCalBtn].forEach(b => b.classList.remove("active"));
     taskListEl.style.display = "none";
     calendarViewEl.style.display = "none";
-    linkViewEl.style.display = "none";
     if (narrowTab === "task") {
       tabTaskBtn.classList.add("active");
       taskListEl.style.display = "";
@@ -1007,21 +920,17 @@
       tabCalBtn.classList.add("active");
       calendarViewEl.style.display = "";
       loadMonthEvents();
-    } else if (narrowTab === "link") {
-      tabLinkBtn.classList.add("active");
-      linkViewEl.style.display = "";
-      loadLinks();
+      refreshQuickLinks();
     }
   }
 
-  // 広い画面(PC)：タスク・リンク・カレンダーを同時に横並び表示
+  // 広い画面(PC)：タスク・カレンダーを同時に横並び表示
   function applyLayout() {
     if (isWide()) {
       taskListEl.style.display = "";
-      linkViewEl.style.display = "";
       calendarViewEl.style.display = "";
       loadMonthEvents();
-      loadLinks();
+      refreshQuickLinks();
     } else {
       renderNarrow();
     }
@@ -1206,13 +1115,7 @@
     dayDetailEl.innerHTML = `<div class="dTitle">${m}月${d}日の予定</div>${rows}`;
   }
 
-  /* ---------- リンク集部分 ---------- */
-
-  const linkListEl = document.getElementById("linkList");
-  const linkNameInput = document.getElementById("linkNameInput");
-  const linkUrlInput = document.getElementById("linkUrlInput");
-
-  document.getElementById("addLinkBtn").addEventListener("click", addLink);
+  /* ---------- リンク集部分(カレンダー内クイックリンク表示のみ) ---------- */
 
   // カレンダー上部（Gmailの隣）にリンク集の中身を丸ボタンで並べる
   function renderQuickLinks(data) {
@@ -1228,80 +1131,13 @@
     }).join("");
   }
 
-  async function loadLinks() {
-    linkListEl.innerHTML = '<div class="empty">読み込み中…</div>';
+  async function refreshQuickLinks() {
     const { data, error } = await sb
       .from("bookmarks")
       .select("*")
       .order("created_at", { ascending: true });
-
-    if (error) {
-      linkListEl.innerHTML = '<div class="empty">リンクの読み込みに失敗しました</div>';
-      return;
-    }
-
+    if (error) return;
     renderQuickLinks(data);
-
-    if (!data || data.length === 0) {
-      linkListEl.innerHTML = '<div class="empty">よく使う業務ページを追加しましょう</div>';
-      return;
-    }
-
-    linkListEl.innerHTML = data.map(link => {
-      // faviconはGoogleのサービスから取得（URLのドメインのアイコン）
-      let host = "";
-      try { host = new URL(link.url).hostname; } catch (e) {}
-      const favicon = host
-        ? `https://www.google.com/s2/favicons?domain=${host}&sz=64`
-        : "";
-      return `
-        <div class="linkItem-wrap" style="position:relative;">
-          <a class="linkItem" href="${escapeHtml(link.url)}" target="_blank" rel="noopener">
-            ${favicon ? `<img class="favicon" src="${favicon}" alt="">` : '<span class="favicon"></span>'}
-            <span class="linkText">
-              <span class="linkName">${escapeHtml(link.name)}</span>
-              <span class="linkUrl">${escapeHtml(link.url)}</span>
-            </span>
-            <span class="linkGo">↗</span>
-          </a>
-          <button class="linkDel" data-id="${link.id}" style="position:absolute; right:6px; top:50%; transform:translateY(-50%);">×</button>
-        </div>`;
-    }).join("");
-
-    linkListEl.querySelectorAll(".linkDel").forEach(btn => {
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        deleteLink(btn.dataset.id);
-      });
-    });
-  }
-
-  async function addLink() {
-    const name = linkNameInput.value.trim();
-    let url = linkUrlInput.value.trim();
-    if (!name || !url) {
-      alert("リンク名とURLの両方を入力してください");
-      return;
-    }
-    // http/httpsが無ければ補う
-    if (!/^https?:\/\//i.test(url)) {
-      url = "https://" + url;
-    }
-
-    const { error } = await sb.from("bookmarks").insert({ name, url });
-    if (error) {
-      alert("追加に失敗しました");
-      return;
-    }
-    linkNameInput.value = "";
-    linkUrlInput.value = "";
-    loadLinks();
-  }
-
-  async function deleteLink(id) {
-    if (!confirm("このリンクを削除しますか？")) return;
-    await sb.from("bookmarks").delete().eq("id", id);
-    loadLinks();
   }
 
   // 期限の日付欄は枠のどこをクリックしてもカレンダーが開くようにする
